@@ -93,6 +93,16 @@ class VAPIClient:
                 await asyncio.sleep(retry_after)
                 return await self._request(method, endpoint, params, json_data)
             
+            if response.status_code == 400:
+                # Handle bad request errors
+                error_data = response.json()
+                logger.error(f"VAPI API bad request: {response.status_code} - {error_data}")
+                raise VAPIError(
+                    message=f"Bad request: {error_data.get('message', 'Invalid request')}",
+                    status_code=response.status_code,
+                    response=error_data
+                )
+            
             response.raise_for_status()
             return response.json()
             
