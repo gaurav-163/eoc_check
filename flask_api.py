@@ -28,6 +28,11 @@ def health_check():
 async def analyze_transcript():
     """Analyze a call transcript"""
     try:
+        if not request.is_json:
+            return jsonify({
+                "error": "Request must be JSON"
+            }), 400
+        
         data = request.get_json()
         call_id = data.get('call_id')
         
@@ -36,11 +41,31 @@ async def analyze_transcript():
                 "error": "call_id is required"
             }), 400
         
+        # Validate call_id format (UUID)
+        import re
+        uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
+        if not uuid_pattern.match(call_id):
+            return jsonify({
+                "error": "call_id must be a valid UUID"
+            }), 400
+        
         # Fetch call data
-        call = await fetch_call_by_id(call_id)
+        try:
+            call = await fetch_call_by_id(call_id)
+        except Exception as fetch_error:
+            logger.error(f"Error fetching call data: {fetch_error}")
+            return jsonify({
+                "error": "Failed to fetch call data. Please check the call_id and try again."
+            }), 404
         
         # Perform analysis
-        analysis = quick_analyze(call)
+        try:
+            analysis = quick_analyze(call)
+        except Exception as analysis_error:
+            logger.error(f"Error analyzing call: {analysis_error}")
+            return jsonify({
+                "error": "Failed to analyze call. Please try again later."
+            }), 500
         
         return jsonify({
             "success": True,
@@ -64,9 +89,9 @@ async def analyze_transcript():
             }
         })
     except Exception as e:
-        logger.error(f"Error analyzing transcript: {e}")
+        logger.error(f"Unexpected error analyzing transcript: {e}")
         return jsonify({
-            "error": str(e)
+            "error": "An unexpected error occurred. Please try again later."
         }), 500
 
 
